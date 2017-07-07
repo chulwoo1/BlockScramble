@@ -47,7 +47,10 @@ public:
 
     assert (SrcIndex.size () == send_buf.size ());
 	int bsize = GCF(Src.DataDim[0],Dest.DataDim[0]);
-	bsize=1;
+//	bsize=1;
+	int mpi_rank ;
+	 MPI_Comm_rank(*mpi_comm, &mpi_rank);
+	if(!mpi_rank)
 	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
@@ -68,6 +71,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	QMP_printf("SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",
 	k,SrcIndex[k],DestWrap,recv_i);
 
+	if(!mpi_rank)
       std::cout<<"SrcIndex "<<SrcIndex[k]<<" Src.BlockTotal "<<Src.BlockTotal()<< " Src.BlockIndex "<<Src.BlockIndex()<<std::endl;
 	// check to see if the SrcIndex is eligible for the block
 	assert ((SrcIndex[k] % Src.BlockTotal ()) == Src.BlockIndex ());
@@ -101,6 +105,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  size_t target = CoorToIndex (DestNodeCoor, GlobalDim);
 	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
 //	  if (0)
+	if(!mpi_rank)
 	    if (target == 0 && offset == 0) {
 	      QMP_printf
 		("target 0 offset 0 DestWrap %d Index %d DestNodeCoor %d %d %d %d DesSiteCoor %d %d %d %d\n",
