@@ -47,7 +47,8 @@ public:
 
     assert (SrcIndex.size () == send_buf.size ());
 	int bsize = GCF(Src.DataDim[0],Dest.DataDim[0]);
-//	std::cout << "bsize: "<<bsize<<std::endl;
+	bsize=1;
+	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
 for (int recv_i = 0; recv_i < recv_max; recv_i++) {
@@ -67,7 +68,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	QMP_printf("SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",
 	k,SrcIndex[k],DestWrap,recv_i);
 
-//      std::cout<<"SrcIndex "<<SrcIndex[k]<<" Src.BlockTotal "<<Src.BlockTotal()<< " Src.BlockIndex "<<Src.BlockIndex()<<std::endl;
+      std::cout<<"SrcIndex "<<SrcIndex[k]<<" Src.BlockTotal "<<Src.BlockTotal()<< " Src.BlockIndex "<<Src.BlockIndex()<<std::endl;
 	// check to see if the SrcIndex is eligible for the block
 	assert ((SrcIndex[k] % Src.BlockTotal ()) == Src.BlockIndex ());
 	std::vector < int >GlobalDim (NDIM);
@@ -77,7 +78,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	}
 
 
-
+//#pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
 	  std::vector < int >SrcCoor (NDIM);	//global site coordinate
 	  IndexToCoor (j, SrcCoor, Src.DataDim);
@@ -99,7 +100,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 
 	  size_t target = CoorToIndex (DestNodeCoor, GlobalDim);
 	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
-	  if (0)
+//	  if (0)
 	    if (target == 0 && offset == 0) {
 	      QMP_printf
 		("target 0 offset 0 DestWrap %d Index %d DestNodeCoor %d %d %d %d DesSiteCoor %d %d %d %d\n",
@@ -113,9 +114,9 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 		   MPI_BYTE, target, offset,
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
 #if 0
-	  -QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
-		       k, mem_size * j, mem_size * sizeof (DATA),
-		       target, offset * mem_size, mem_size * sizeof (DATA));
+	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
+		       k, mem_size * j, bsize*mem_size * sizeof (DATA),
+		       target, offset , bsize*mem_size * sizeof (DATA));
 #endif
 	}
       }

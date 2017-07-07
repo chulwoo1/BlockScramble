@@ -18,7 +18,7 @@
  * Get current time in milli seconds.
  */
 static double
-get_current_time (void)
+dclock (void)
 {
   struct timeval tv;
 
@@ -58,6 +58,8 @@ int init_QMP(int *argc, char*** argv,
     int NDIM = QMP_get_allocated_number_of_dimensions();
     const int *peGrid_t = QMP_get_allocated_dimensions();
     const int *pePos_t = QMP_get_allocated_coordinates();
+  if (!QMP_get_node_number())
+   QMP_printf("QMP threading %d requested, %d provided\n",req,prv);
 //    assert(NDIM==4);
 
 //  status = QMP_declare_logical_topology ((int *)GlobalDim.data(), NDIM);
@@ -116,6 +118,7 @@ int main (int argc, char** argv)
   int mem_size = atoi (argv[2]);
   int nblock = atoi (argv[3]);
 
+    int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
     BlockGeometry Src(NDIM);
     BlockGeometry Dest(NDIM);
@@ -125,7 +128,8 @@ int main (int argc, char** argv)
     for(int i=0;i<NDIM;i++){
 		Src.BlockDim[i]=1;
 		Dest.BlockDim[i]=1;
-		TotalSites[i] = 2*GlobalDim[i];
+		TotalSites[i] = sites*GlobalDim[i];
+	
 	}	
 
 	assert(nblock <=BlockGeometry::Total(GlobalDim));
@@ -134,7 +138,7 @@ int main (int argc, char** argv)
 		if( Dest.BlockDim[temp_ind]  < GlobalDim[temp_ind] ){
 		Dest.BlockDim[temp_ind] *=2;
 		nblock = nblock/2;
-//		printf("Dest.BlockDim[%d]=%d nblock=%d\n",temp_ind,Dest.BlockDim[temp_ind],nblock);
+		if(!GlobalIndex)printf("Dest.BlockDim[%d]=%d nblock=%d\n",temp_ind,Dest.BlockDim[temp_ind],nblock);
 		}
 		temp_ind = (temp_ind+1)%NDIM;
 	}
@@ -144,10 +148,12 @@ int main (int argc, char** argv)
 	Src.SetLocal(GlobalPos,GlobalDim,TotalSites);
 	Dest.SetLocal(GlobalPos,GlobalDim,TotalSites);
 
-    int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
-	if(!GlobalIndex) printf ("GlobalDim = %d %d %d %d \n",
+	if(!GlobalIndex) 
+	printf ("GlobalDim = %d %d %d %d \n",
 	GlobalDim[0], GlobalDim[1], GlobalDim[2], GlobalDim[3]);
+	if(!GlobalIndex) 
+	std::cout << "Dest.BlockDim= "<<Dest.BlockDim<<std::endl;
 
 	if(0)
     PRINT ("GlobalPos = %d %d %d %d \n",
@@ -174,6 +180,7 @@ int main (int argc, char** argv)
 	Dest.NodePos[0],Dest.NodePos[1],Dest.NodePos[2],Dest.NodePos[3],Dest.NodeIndex());
 		
 
+	double bytes = sizeof(DATA)*mem_size*Dest.DataVol();
 	int VecTotal = Dest.BlockTotal();
 	DATA * send_buf[VecTotal];
 	for(int i=0;i<VecTotal;i++) 
@@ -184,7 +191,7 @@ int main (int argc, char** argv)
 	while( offset1 <mem_size ) offset1 *=10;
 	size_t offset2 = 10;
 	while( offset2 <BlockGeometry::Total(TotalSites) ) offset2 *=10;
-	if(0)
+//	if(0)
 	if (!GlobalIndex) std::cout << "offset1= "<<offset1<<" offset2= "<<offset2<<std::endl;
 
     for(size_t k=0;k<VecTotal;k++)
@@ -214,7 +221,12 @@ int main (int argc, char** argv)
 		sbuf[i] = send_buf[i];
 	}
 	Scramble<DATA> scr1(mem_size, &mpi_comm);
+	double t0 = dclock();
 	scr1.run(Src,Index,sbuf,Dest,rbuf);
+	double t1 = dclock();
+	double bw = bytes/(t1-t0)/1000.; 
+	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
+
 
     for(size_t j=0;j<Dest.DataVol();j++)
     for(int i=0;i<mem_size;i++){
@@ -227,6 +239,7 @@ int main (int argc, char** argv)
 		if( recv_buf[i+mem_size*j]!=(i+offset1*(index+offset2*Dest.BlockIndex())) ) 
     	PRINT ("recv_buf[%d][%d][%d] = %d (%d)\n",Dest.BlockIndex(),j,i,recv_buf[i+mem_size*j], (i+offset1*(index+offset2*Dest.BlockIndex())) );
     }
+	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run check %g ms\n",t1-t0); t0=t1;
 
 
 	Index.resize(1);
@@ -239,7 +252,11 @@ int main (int argc, char** argv)
 	for(int i=0;i<VecTotal;i++){
 		rbuf[i] = recv2+i*mem_size*Src.DataVol();
 	}
+	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run setup %g ms\n",t1-t0); t0=t1;
 	scr1.run(Dest,Index,sbuf,Src,rbuf);
+	t1 = dclock(); 
+	bw = bytes/(t1-t0)/1000.; 
+	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 	
 	if(1) 
     for(size_t k=0;k<Dest.BlockTotal();k++)
@@ -253,6 +270,7 @@ int main (int argc, char** argv)
 
 
   
+  QMP_printf("All passed!\n");
 
   QMP_finalize_msg_passing ();
 

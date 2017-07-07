@@ -4,10 +4,11 @@
 template<typename T>
 std::ostream& operator<<(std::ostream&s, std::vector<T> t) {
 		s<<"[";
-	for(auto i: t) { 
+	for(int i=0;i<t.size();i++){
 		s << " " <<t[i] ;
 	}
-		s<<"]"<<std::endl;
+		s<<"]";
+	return s;
 }
 
 class 	CartesianGeometry {
