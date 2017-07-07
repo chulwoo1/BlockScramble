@@ -11,17 +11,32 @@ public:
 
   size_t mem_size;
   MPI_Comm *mpi_comm;
+  int verb;
+  int rank, size;
 
-  Scramble (int _mem_size, MPI_Comm * _mpi_comm):mem_size (_mem_size),
-    mpi_comm (_mpi_comm)
-  {}
+  Scramble (int _mem_size, MPI_Comm * _mpi_comm, int _verb=0)
+	:mem_size (_mem_size), mpi_comm (_mpi_comm),verb(_verb)
+  {
+	MPI_Comm_rank(*mpi_comm,&rank);
+	MPI_Comm_size(*mpi_comm,&size);
+  }
+
+  void SetVerbosity(int _verb) {verb=_verb;}
+
+#if 1
+  friend std::ostream& operator<<(std::ostream&s, Scramble &scr ) {
+	s<< "Scramble: " << scr.rank <<" of "<<scr.size<<" : ";
+        return s;
+  }
+#endif
 
   int GCF(int a, int b){
 
 	int small,large;
 	if (a>b){ large=a;small=b;}
 	else { large=b;small=a;}
-//	std::cout << "GCF: "<<large<<" "<<small<<std::endl;
+	if (verb>6)
+	std::cout << "GCF: "<<large<<" "<<small<<std::endl;
 	
 	int tmp = (large%small);
 	while( tmp > 0 ){
@@ -47,7 +62,8 @@ public:
 
     assert (SrcIndex.size () == send_buf.size ());
 	int bsize = GCF(Src.DataDim[0],Dest.DataDim[0]);
-	bsize=1;
+//	bsize=1;
+	if (verb>5)
 	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
@@ -64,10 +80,11 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  int DestWrap = SrcIndex[k]/Dest.BlockTotal();
 
 	if (DestWrap != recv_i) continue;
-	if(0)
+	if(verb>5)
 	QMP_printf("SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",
 	k,SrcIndex[k],DestWrap,recv_i);
 
+	if (verb>5)
       std::cout<<"SrcIndex "<<SrcIndex[k]<<" Src.BlockTotal "<<Src.BlockTotal()<< " Src.BlockIndex "<<Src.BlockIndex()<<std::endl;
 	// check to see if the SrcIndex is eligible for the block
 	assert ((SrcIndex[k] % Src.BlockTotal ()) == Src.BlockIndex ());
@@ -100,7 +117,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 
 	  size_t target = CoorToIndex (DestNodeCoor, GlobalDim);
 	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
-//	  if (0)
+	if(verb>3)
 	    if (target == 0 && offset == 0) {
 	      QMP_printf
 		("target 0 offset 0 DestWrap %d Index %d DestNodeCoor %d %d %d %d DesSiteCoor %d %d %d %d\n",
@@ -113,6 +130,8 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
 		   MPI_BYTE, target, offset,
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
+	if(verb>6)
+	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
 #if 0
 	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
 		       k, mem_size * j, bsize*mem_size * sizeof (DATA),

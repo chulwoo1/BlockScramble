@@ -270,7 +270,7 @@ int main (int argc, char** argv)
 
 
   
-  QMP_printf("All passed!\n");
+  std::cout <<scr1 <<"All passed!"<<std::endl;
 
   QMP_finalize_msg_passing ();
 
