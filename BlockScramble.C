@@ -9,8 +9,8 @@
 #include <qmp.h>
 #include <mpi.h>
 #include <vector>
+#include <iostream>
 
-#include <Grid/Grid.h>
 #include "BlockGeom.h"
 #include "Scramble.h"
 
@@ -82,6 +82,8 @@ GlobalPos.resize(NDIM);
 	return NDIM;
 }
 
+#ifdef USE_GRID
+#include <Grid/Grid.h>
 int init_Grid(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -104,6 +106,7 @@ int init_Grid(int *argc, char*** argv,
 	return NDIM;
 	
 }
+#endif
 
 int main (int argc, char** argv)
 {
@@ -117,6 +120,7 @@ int main (int argc, char** argv)
   int sites = atoi (argv[1]); //global size
   int mem_size = atoi (argv[2]);
   int nblock = atoi (argv[3]);
+  int verb = atoi (argv[4]);
 
     int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
@@ -220,14 +224,16 @@ int main (int argc, char** argv)
 		Index[i] = i;
 		sbuf[i] = send_buf[i];
 	}
-	Scramble<DATA> scr1(mem_size, &mpi_comm);
+	Scramble<DATA> scr1(mem_size, &mpi_comm,verb);
 	double t0 = dclock();
+	MPI_Barrier(mpi_comm);
 	scr1.run(Src,Index,sbuf,Dest,rbuf);
+	MPI_Barrier(mpi_comm);
 	double t1 = dclock();
 	double bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 
-
+#pragma omp parallel for
     for(size_t j=0;j<Dest.DataVol();j++)
     for(int i=0;i<mem_size;i++){
 		std::vector<int> DestCoor(NDIM);
@@ -253,12 +259,14 @@ int main (int argc, char** argv)
 		rbuf[i] = recv2+i*mem_size*Src.DataVol();
 	}
 	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run setup %g ms\n",t1-t0); t0=t1;
+	MPI_Barrier(mpi_comm);
 	scr1.run(Dest,Index,sbuf,Src,rbuf);
+	MPI_Barrier(mpi_comm);
 	t1 = dclock(); 
 	bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 	
-	if(1) 
+#pragma omp parallel for
     for(size_t k=0;k<Dest.BlockTotal();k++)
     for(size_t j=0;j<Src.DataVol();j++)
     for(size_t i=0;i<mem_size;i++)
@@ -267,6 +275,7 @@ int main (int argc, char** argv)
     	PRINT ("send_buf[%d][%d][%d] = %d\n",k,j,i,*(send_buf[k]+i+mem_size*j));
     	PRINT ("recv2[%d][%d][%d] = %d\n",k,j,i,*(recv2+i+mem_size*(j+Src.DataVol()*k)));
     }
+	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run check %g ms\n",t1-t0); t0=t1;
 
 
   

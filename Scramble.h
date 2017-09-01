@@ -74,6 +74,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 			&recv_win);
 	MPI_Win_fence (MPI_MODE_NOPRECEDE, recv_win);
 
+//#pragma omp parallel for 
       for (int k = 0; k < SrcIndex.size (); k++) {
 	  std::vector < int >DestBlockCoor (NDIM);
 	  IndexToCoor (SrcIndex[k], DestBlockCoor, Dest.BlockDim);
@@ -95,7 +96,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	}
 
 
-//#pragma omp parallel for 
+#pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
 	  std::vector < int >SrcCoor (NDIM);	//global site coordinate
 	  IndexToCoor (j, SrcCoor, Src.DataDim);
@@ -115,8 +116,8 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  }
 
 
-	  size_t target = CoorToIndex (DestNodeCoor, GlobalDim);
-	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
+	  int target = CoorToIndex (DestNodeCoor, GlobalDim);
+	  MPI_Aint offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
 	if(verb>3)
 	    if (target == 0 && offset == 0) {
 	      QMP_printf
@@ -126,12 +127,14 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 		 DestSiteCoor[1], DestSiteCoor[2], DestSiteCoor[3]);
 	    }
 	  assert (DestWrap < recv_max);
-
+#pragma omp critical
+{
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
 		   MPI_BYTE, target, offset,
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
 	if(verb>6)
 	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
+}
 #if 0
 	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
 		       k, mem_size * j, bsize*mem_size * sizeof (DATA),

@@ -27,19 +27,19 @@ static	size_t CoorToIndex(std::vector <int> & Pos,std::vector <int > & Dim){
 //	std::cout <<"Dim "<<Dim;
 	unsigned int ndim = Pos.size();
 	assert(ndim==Dim.size());
-	int tmp = Pos[ndim-1];
+	size_t tmp = Pos[ndim-1];
 	for(int i = ndim-2;i>=0;i--){
 		tmp = tmp*Dim[i] + Pos[i];
 	}
 	return tmp;
 	}
 
-static	int IndexToCoor( size_t index, 
+static	size_t IndexToCoor( size_t index, 
 				std::vector <int> & Pos,
 				std::vector <int > & Dim){
 	unsigned int ndim = Pos.size();
 	assert(ndim==Dim.size());
-	int tmp = index;
+	size_t tmp = index;
 	for(int i = 0;i<ndim;i++){
 		Pos[i] = tmp % Dim[i];
 		tmp = tmp / Dim[i];
