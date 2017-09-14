@@ -2,7 +2,7 @@
 #define SCRAMBLE_H
 
 #include <mpi.h>
-#include <qmp.h>
+//#include <qmp.h>
 #include "BlockGeom.h"
 
 template < typename DATA > 
@@ -81,7 +81,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 
 	if (DestWrap != recv_i) continue;
 	if(verb>5)
-	QMP_printf("SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",
+	printf("rank %d: SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",rank,
 	k,SrcIndex[k],DestWrap,recv_i);
 
 	if(!rank)
@@ -98,7 +98,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 
 #pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
-	if(verb>1)
+	if(verb>5)
 	std::cout <<j<<" : thread "<<omp_get_thread_num()<<" of "<<omp_get_num_threads()<<std::endl;
 	  std::vector < int >SrcCoor (NDIM);	//global site coordinate
 	  IndexToCoor (j, SrcCoor, Src.DataDim);
@@ -122,7 +122,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
 	if(verb>3 &&  !rank)
 	    if (target == 0 && offset == 0) {
-	      QMP_printf
+	      printf
 		("target 0 offset 0 DestWrap %d Index %d DestNodeCoor %d %d %d %d DesSiteCoor %d %d %d %d\n",
 		 DestWrap, SrcIndex[k], DestNodeCoor[0], DestNodeCoor[1],
 		 DestNodeCoor[2], DestNodeCoor[3], DestSiteCoor[0],
@@ -139,8 +139,8 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
 }
 #if 0
-	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
-		       k, mem_size * j, bsize*mem_size * sizeof (DATA),
+	  printf ("rank %d: MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
+		       rank, k, mem_size * j, bsize*mem_size * sizeof (DATA),
 		       target, offset , bsize*mem_size * sizeof (DATA));
 #endif
 	}

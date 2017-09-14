@@ -9,12 +9,10 @@
 
 
 
-#include <qmp.h>
 #include <mpi.h>
 #include <vector>
 
 
-//#include <Grid/Grid.h>
 #include "BlockGeom.h"
 #include "Scramble.h"
 
@@ -37,6 +35,8 @@ typedef int64_t DATA;
 //#define PRINT QMP_printf
 #define PRINT printf
 
+static int verb=0;
+
 int init_MPI(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -52,16 +52,13 @@ int init_MPI(int *argc, char*** argv,
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-//  int sites = atoi (argv[1]); //global size
-//  int mem_size = atoi (argv[2]);
-//  int nblock = atoi (argv[3]);
   if (*argc < 6) 
     if (!rank){
       fprintf (stderr, "Usage: %s sites mem_size nblock verb geom \n", argv[0]);
     exit (1);
   }
 
-  int NDIM = *argc-4;
+  int NDIM = *argc-5;
   if (!rank)
    printf("NDIM=%d\n",NDIM);
   GlobalDim.resize(NDIM);
@@ -73,15 +70,18 @@ int init_MPI(int *argc, char*** argv,
 
   int pos = rank;
     for(int i =0;i<NDIM;i++){
-        GlobalDim[i] = atoi((*argv)[i+4]);
+        GlobalDim[i] = atoi((*argv)[i+5]);
         GlobalPos[i] = pos % GlobalDim[i];
 		pos = pos/GlobalDim[i];
+		if(verb>4)
 		printf(" %d : %d %d\n",rank,GlobalDim[i],GlobalPos[i]);
     }
 
 	return NDIM;
 }
 
+#ifdef USE_QMP
+#include <qmp.h>
 int init_QMP(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -130,8 +130,10 @@ GlobalPos.resize(NDIM);
 
 	return NDIM;
 }
+#endif
 
-#if 0
+#ifdef USE_GRID
+#include <Grid/Grid.h>
 int init_Grid(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -162,14 +164,15 @@ int main (int argc, char** argv)
   std::vector<int> GlobalDim(4);
   std::vector<int> GlobalPos(4);
 
-  int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
-//  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
-//  int NDIM = init_Grid(&argc,&argv,GlobalDim,GlobalPos);
   int loops;
   int sites = atoi (argv[1]); //global size
   int mem_size = atoi (argv[2]);
   int nblock = atoi (argv[3]);
-  int verb = atoi (argv[4]);
+  verb = atoi (argv[4]);
+
+  int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
+//  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
+//  int NDIM = init_Grid(&argc,&argv,GlobalDim,GlobalPos);
 
     int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
@@ -186,14 +189,14 @@ int main (int argc, char** argv)
 	}	
 
 	assert(nblock <=BlockGeometry::Total(GlobalDim));
-	int temp_ind=0;
+	int temp_ind=NDIM-1;
 	while(nblock >1 ){
 		if( Dest.BlockDim[temp_ind]  < GlobalDim[temp_ind] ){
 		Dest.BlockDim[temp_ind] *=2;
 		nblock = nblock/2;
 		if(!GlobalIndex)printf("Dest.BlockDim[%d]=%d nblock=%d\n",temp_ind,Dest.BlockDim[temp_ind],nblock);
 		}
-		temp_ind = (temp_ind+1)%NDIM;
+		temp_ind = (temp_ind-1+NDIM)%NDIM;
 	}
 //	std::cout << "Dest.BlockDim= "<<Dest.BlockDim;
 //	std::cout <<std::endl;
@@ -325,7 +328,11 @@ int main (int argc, char** argv)
   
   std::cout <<scr1 <<"All passed!"<<std::endl;
 
+#ifdef USE_QMP
   QMP_finalize_msg_passing ();
+#else
+  MPI_Finalize();
+#endif
 
   return 0;
 }
