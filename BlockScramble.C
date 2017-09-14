@@ -33,6 +33,51 @@ typedef int64_t DATA;
 #define PRINT QMP_printf
 //#define PRINT printf
 
+int init_MPI(int *argc, char*** argv,
+    std::vector<int> &GlobalDim,
+    std::vector<int> &GlobalPos
+	){
+
+//  QMP_status_t status, err;
+  int req, prv;
+
+  req = MPI_THREAD_MULTIPLE;
+  int status = MPI_Init_thread (argc, argv, req, &prv);
+
+  int rank,size;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  MPI_Comm_size(MPI_COMM_WORLD,&size);
+
+//  int sites = atoi (argv[1]); //global size
+//  int mem_size = atoi (argv[2]);
+//  int nblock = atoi (argv[3]);
+  if (*argc < 6) 
+    if (!rank){
+      fprintf (stderr, "Usage: %s sites mem_size nblock verb geom \n", argv[0]);
+    exit (1);
+  }
+
+  int NDIM = *argc-4;
+  if (!rank)
+   printf("NDIM=%d\n",NDIM);
+  GlobalDim.resize(NDIM);
+  GlobalPos.resize(NDIM);
+  
+
+  if (!rank)
+   printf("MPI threading %d requested, %d provided\n",req,prv);
+
+  int pos = rank;
+    for(int i =0;i<NDIM;i++){
+        GlobalDim[i] = atoi((*argv)[i+4]);
+        GlobalPos[i] = pos % GlobalDim[i];
+		pos = pos/GlobalDim[i];
+		printf(" %d : %d %d\n",rank,GlobalDim[i],GlobalPos[i]);
+    }
+
+	return NDIM;
+}
+
 int init_QMP(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -111,7 +156,8 @@ int main (int argc, char** argv)
   std::vector<int> GlobalDim(4);
   std::vector<int> GlobalPos(4);
 
-  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
+  int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
+//  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
 //  int NDIM = init_Grid(&argc,&argv,GlobalDim,GlobalPos);
   int loops;
   int sites = atoi (argv[1]); //global size
