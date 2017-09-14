@@ -96,8 +96,10 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	}
 
 
-//#pragma omp parallel for 
+#pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
+	if(verb>1)
+	std::cout <<j<<" : thread "<<omp_get_thread_num()<<" of "<<omp_get_num_threads()<<std::endl;
 	  std::vector < int >SrcCoor (NDIM);	//global site coordinate
 	  IndexToCoor (j, SrcCoor, Src.DataDim);
 	  for (int i = 0; i < NDIM; i++) {
@@ -128,11 +130,14 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	    }
 	  assert (DestWrap < recv_max);
 
+#pragma omp critical
+{
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
 		   MPI_BYTE, target, offset,
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
 	if(verb>6)
 	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
+}
 #if 0
 	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
 		       k, mem_size * j, bsize*mem_size * sizeof (DATA),
