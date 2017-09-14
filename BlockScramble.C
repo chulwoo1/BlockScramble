@@ -5,12 +5,16 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <omp.h>
+
+
 
 #include <qmp.h>
 #include <mpi.h>
 #include <vector>
 
-#include <Grid/Grid.h>
+
+//#include <Grid/Grid.h>
 #include "BlockGeom.h"
 #include "Scramble.h"
 
@@ -30,8 +34,8 @@ dclock (void)
 #define MEM_SIZE 81920 
 typedef int64_t DATA;
 
-#define PRINT QMP_printf
-//#define PRINT printf
+//#define PRINT QMP_printf
+#define PRINT printf
 
 int init_QMP(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
@@ -82,6 +86,7 @@ GlobalPos.resize(NDIM);
 	return NDIM;
 }
 
+#if 0
 int init_Grid(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -104,6 +109,7 @@ int init_Grid(int *argc, char*** argv,
 	return NDIM;
 	
 }
+#endif
 
 int main (int argc, char** argv)
 {
@@ -117,6 +123,7 @@ int main (int argc, char** argv)
   int sites = atoi (argv[1]); //global size
   int mem_size = atoi (argv[2]);
   int nblock = atoi (argv[3]);
+  int verb = atoi (argv[4]);
 
     int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
@@ -199,8 +206,8 @@ int main (int argc, char** argv)
     for(size_t i=0;i<mem_size;i++){
 		std::vector <int> SrcCoor(NDIM);
 		BlockGeometry::IndexToCoor(j,SrcCoor,Src.DataDim);
-		for(int i=0;i<NDIM;i++){
-			SrcCoor[i] += Src.NodePos[i]*Src.DataDim[i];
+		for(int dim=0;dim<NDIM;dim++){
+			SrcCoor[dim] += Src.NodePos[dim]*Src.DataDim[dim];
 		}
 		size_t coor = BlockGeometry::CoorToIndex(SrcCoor,TotalSites);
 	   *(send_buf[k] + i+mem_size*j )=i+offset1*(coor+offset2*k);
@@ -220,7 +227,7 @@ int main (int argc, char** argv)
 		Index[i] = i;
 		sbuf[i] = send_buf[i];
 	}
-	Scramble<DATA> scr1(mem_size, &mpi_comm);
+	Scramble<DATA> scr1(mem_size, &mpi_comm,verb);
 	double t0 = dclock();
 	scr1.run(Src,Index,sbuf,Dest,rbuf);
 	double t1 = dclock();
@@ -264,8 +271,8 @@ int main (int argc, char** argv)
     for(size_t i=0;i<mem_size;i++)
 	if( *(send_buf[k]+i+mem_size*j) != *(recv2+i+mem_size*(j+Src.DataVol()*k)) ) 
     {
-    	PRINT ("send_buf[%d][%d][%d] = %d\n",k,j,i,*(send_buf[k]+i+mem_size*j));
-    	PRINT ("recv2[%d][%d][%d] = %d\n",k,j,i,*(recv2+i+mem_size*(j+Src.DataVol()*k)));
+    	PRINT ("send_buf[%ld][%ld][%ld] = %ld\n",k,j,i,*(send_buf[k]+i+mem_size*j));
+    	PRINT ("recv2[%ld][%ld][%ld] = %ld\n",k,j,i,*(recv2+i+mem_size*(j+Src.DataVol()*k)));
     }
 
 
