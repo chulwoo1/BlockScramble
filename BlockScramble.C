@@ -123,6 +123,7 @@ int main (int argc, char** argv)
   int verb = atoi (argv[4]);
 
     int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
+    int GlobalTotal = BlockGeometry::Total(GlobalDim);
 
     BlockGeometry Src(NDIM);
     BlockGeometry Dest(NDIM);
@@ -137,14 +138,14 @@ int main (int argc, char** argv)
 	}	
 
 	assert(nblock <=BlockGeometry::Total(GlobalDim));
-	int temp_ind=0;
+	int temp_ind=NDIM-1;
 	while(nblock >1 ){
 		if( Dest.BlockDim[temp_ind]  < GlobalDim[temp_ind] ){
 		Dest.BlockDim[temp_ind] *=2;
 		nblock = nblock/2;
 		if(!GlobalIndex)printf("Dest.BlockDim[%d]=%d nblock=%d\n",temp_ind,Dest.BlockDim[temp_ind],nblock);
 		}
-		temp_ind = (temp_ind+1)%NDIM;
+		temp_ind = (temp_ind-1+NDIM)%NDIM;
 	}
 //	std::cout << "Dest.BlockDim= "<<Dest.BlockDim;
 //	std::cout <<std::endl;
@@ -185,6 +186,7 @@ int main (int argc, char** argv)
 		
 
 	double bytes = sizeof(DATA)*mem_size*Dest.DataVol();
+    	size_t a2a_size = (sizeof(DATA)*mem_size*Dest.DataVol())/GlobalTotal;
 	int VecTotal = Dest.BlockTotal();
 	DATA * send_buf[VecTotal];
 	for(int i=0;i<VecTotal;i++) 
@@ -225,12 +227,21 @@ int main (int argc, char** argv)
 		sbuf[i] = send_buf[i];
 	}
 	Scramble<DATA> scr1(mem_size, &mpi_comm,verb);
+
 	double t0 = dclock();
 	MPI_Barrier(mpi_comm);
-	scr1.run(Src,Index,sbuf,Dest,rbuf);
+    MPI_Alltoall(recv_buf,a2a_size,MPI_BYTE,recv2,a2a_size,MPI_BYTE,mpi_comm);
 	MPI_Barrier(mpi_comm);
 	double t1 = dclock();
 	double bw = bytes/(t1-t0)/1000.; 
+	if(!GlobalIndex) PRINT("MPI_Alltoall %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
+
+	t0 = dclock();
+	MPI_Barrier(mpi_comm);
+	scr1.run(Src,Index,sbuf,Dest,rbuf);
+	MPI_Barrier(mpi_comm);
+	t1 = dclock();
+	bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 
 #pragma omp parallel for
