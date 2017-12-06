@@ -2,7 +2,7 @@
 #define SCRAMBLE_H
 
 #include <mpi.h>
-#include <qmp.h>
+//#include <qmp.h>
 #include "BlockGeom.h"
 
 template < typename DATA > 
@@ -63,7 +63,7 @@ public:
     assert (SrcIndex.size () == send_buf.size ());
 	int bsize = GCF(Src.DataDim[0],Dest.DataDim[0]);
 //	bsize=1;
-	if (verb>5)
+	if (verb>5 && !rank )
 	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
@@ -74,7 +74,6 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 			&recv_win);
 	MPI_Win_fence (MPI_MODE_NOPRECEDE, recv_win);
 
-//#pragma omp parallel for 
       for (int k = 0; k < SrcIndex.size (); k++) {
 	  std::vector < int >DestBlockCoor (NDIM);
 	  IndexToCoor (SrcIndex[k], DestBlockCoor, Dest.BlockDim);
@@ -82,9 +81,10 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 
 	if (DestWrap != recv_i) continue;
 	if(verb>5)
-	QMP_printf("SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",
+	printf("rank %d: SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",rank,
 	k,SrcIndex[k],DestWrap,recv_i);
 
+	if(!rank)
 	if (verb>5)
       std::cout<<"SrcIndex "<<SrcIndex[k]<<" Src.BlockTotal "<<Src.BlockTotal()<< " Src.BlockIndex "<<Src.BlockIndex()<<std::endl;
 	// check to see if the SrcIndex is eligible for the block
@@ -96,8 +96,10 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	}
 
 
-#pragma omp parallel for 
+//#pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
+	if(verb>5)
+	std::cout <<j<<" : thread "<<omp_get_thread_num()<<" of "<<omp_get_num_threads()<<std::endl;
 	  std::vector < int >SrcCoor (NDIM);	//global site coordinate
 	  IndexToCoor (j, SrcCoor, Src.DataDim);
 	  for (int i = 0; i < NDIM; i++) {
@@ -116,28 +118,28 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  }
 
 
-	  int target = CoorToIndex (DestNodeCoor, GlobalDim);
-	  MPI_Aint offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
-	if(verb>3)
+	  size_t target = CoorToIndex (DestNodeCoor, GlobalDim);
+	  size_t offset = CoorToIndex (DestSiteCoor, Dest.DataDim);
+	if(verb>3 &&  !rank)
 	    if (target == 0 && offset == 0) {
-	      QMP_printf
+	      printf
 		("target 0 offset 0 DestWrap %d Index %d DestNodeCoor %d %d %d %d DesSiteCoor %d %d %d %d\n",
 		 DestWrap, SrcIndex[k], DestNodeCoor[0], DestNodeCoor[1],
 		 DestNodeCoor[2], DestNodeCoor[3], DestSiteCoor[0],
 		 DestSiteCoor[1], DestSiteCoor[2], DestSiteCoor[3]);
 	    }
 	  assert (DestWrap < recv_max);
-#pragma omp critical
+//#pragma omp critical
 {
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
 		   MPI_BYTE, target, offset,
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
 	if(verb>6)
-	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
+	std::cout << *this << "MPI_Put: send_buf["<< k << "][" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
 }
 #if 0
-	  QMP_printf ("MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
-		       k, mem_size * j, bsize*mem_size * sizeof (DATA),
+	  printf ("rank %d: MPI_Put: send_buf[%d]+%d %d : %d %d %d\n",
+		       rank, k, mem_size * j, bsize*mem_size * sizeof (DATA),
 		       target, offset , bsize*mem_size * sizeof (DATA));
 #endif
 	}

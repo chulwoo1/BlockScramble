@@ -5,8 +5,10 @@
 #include <sys/time.h>
 #include <time.h>
 #include <assert.h>
+#include <omp.h>
 
-#include <qmp.h>
+
+
 #include <mpi.h>
 #include <vector>
 #include <iostream>
@@ -28,11 +30,57 @@ dclock (void)
 }
 
 #define MEM_SIZE 81920 
-typedef int64_t DATA;
+typedef uint64_t DATA;
 
-#define PRINT QMP_printf
-//#define PRINT printf
+//#define PRINT QMP_printf
+#define PRINT printf
 
+static int verb=0;
+
+int init_MPI(int *argc, char*** argv,
+    std::vector<int> &GlobalDim,
+    std::vector<int> &GlobalPos
+	){
+
+  int req, prv;
+
+  req = MPI_THREAD_MULTIPLE;
+  int status = MPI_Init_thread (argc, argv, req, &prv);
+
+  int rank,size;
+  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
+  MPI_Comm_size(MPI_COMM_WORLD,&size);
+
+  if (*argc < 6) 
+    if (!rank){
+      fprintf (stderr, "Usage: %s sites mem_size nblock verb geom \n", argv[0]);
+    exit (1);
+  }
+
+  int NDIM = *argc-5;
+  if (!rank)
+   printf("NDIM=%d\n",NDIM);
+  GlobalDim.resize(NDIM);
+  GlobalPos.resize(NDIM);
+  
+
+  if (!rank)
+   printf("MPI threading %d requested, %d provided\n",req,prv);
+
+  int pos = rank;
+    for(int i =0;i<NDIM;i++){
+        GlobalDim[i] = atoi((*argv)[i+5]);
+        GlobalPos[i] = pos % GlobalDim[i];
+		pos = pos/GlobalDim[i];
+		if(verb>4)
+		printf(" %d : %d %d\n",rank,GlobalDim[i],GlobalPos[i]);
+    }
+
+	return NDIM;
+}
+
+#ifdef USE_QMP
+#include <qmp.h>
 int init_QMP(int *argc, char*** argv,
     std::vector<int> &GlobalDim,
     std::vector<int> &GlobalPos
@@ -81,6 +129,7 @@ GlobalPos.resize(NDIM);
 
 	return NDIM;
 }
+#endif
 
 #ifdef USE_GRID
 #include <Grid/Grid.h>
@@ -114,13 +163,15 @@ int main (int argc, char** argv)
   std::vector<int> GlobalDim(4);
   std::vector<int> GlobalPos(4);
 
-  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
-//  int NDIM = init_Grid(&argc,&argv,GlobalDim,GlobalPos);
   int loops;
-  int sites = atoi (argv[1]); //global size
-  int mem_size = atoi (argv[2]);
+  int sites = atoi (argv[1]); //local size
+  size_t mem_size = atol (argv[2]);
   int nblock = atoi (argv[3]);
-  int verb = atoi (argv[4]);
+  verb = atoi (argv[4]);
+
+  int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
+//  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
+//  int NDIM = init_Grid(&argc,&argv,GlobalDim,GlobalPos);
 
     int GlobalIndex = BlockGeometry::CoorToIndex(GlobalPos,GlobalDim);
 
@@ -137,14 +188,14 @@ int main (int argc, char** argv)
 	}	
 
 	assert(nblock <=BlockGeometry::Total(GlobalDim));
-	int temp_ind=0;
+	int temp_ind=NDIM-1;
 	while(nblock >1 ){
 		if( Dest.BlockDim[temp_ind]  < GlobalDim[temp_ind] ){
 		Dest.BlockDim[temp_ind] *=2;
 		nblock = nblock/2;
 		if(!GlobalIndex)printf("Dest.BlockDim[%d]=%d nblock=%d\n",temp_ind,Dest.BlockDim[temp_ind],nblock);
 		}
-		temp_ind = (temp_ind+1)%NDIM;
+		temp_ind = (temp_ind-1+NDIM)%NDIM;
 	}
 //	std::cout << "Dest.BlockDim= "<<Dest.BlockDim;
 //	std::cout <<std::endl;
@@ -185,7 +236,7 @@ int main (int argc, char** argv)
 		
 
 	double bytes = sizeof(DATA)*mem_size*Dest.DataVol();
-	int VecTotal = Dest.BlockTotal();
+	size_t VecTotal = Dest.BlockTotal();
 	DATA * send_buf[VecTotal];
 	for(int i=0;i<VecTotal;i++) 
 		send_buf[i]= (DATA*)malloc(sizeof(DATA)*mem_size*Src.DataVol());
@@ -203,15 +254,15 @@ int main (int argc, char** argv)
     for(size_t i=0;i<mem_size;i++){
 		std::vector <int> SrcCoor(NDIM);
 		BlockGeometry::IndexToCoor(j,SrcCoor,Src.DataDim);
-		for(int i=0;i<NDIM;i++){
-			SrcCoor[i] += Src.NodePos[i]*Src.DataDim[i];
+		for(int dim=0;dim<NDIM;dim++){
+			SrcCoor[dim] += Src.NodePos[dim]*Src.DataDim[dim];
 		}
 		size_t coor = BlockGeometry::CoorToIndex(SrcCoor,TotalSites);
 	   *(send_buf[k] + i+mem_size*j )=i+offset1*(coor+offset2*k);
 	}
 
-    for(int j=0;j<Dest.DataVol();j++)
-    for(int i=0;i<mem_size;i++){
+    for(size_t j=0;j<Dest.DataVol();j++)
+    for(size_t i=0;i<mem_size;i++){
 	recv_buf[i+mem_size*j]=-1;
 	recv2[i+mem_size*j]=-1;
 	}
@@ -233,9 +284,9 @@ int main (int argc, char** argv)
 	double bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 
-#pragma omp parallel for
+//#pragma omp parallel for
     for(size_t j=0;j<Dest.DataVol();j++)
-    for(int i=0;i<mem_size;i++){
+    for(size_t i=0;i<mem_size;i++){
 		std::vector<int> DestCoor(NDIM);
 		BlockGeometry::IndexToCoor(j,DestCoor,Dest.DataDim);
 		for(int k=0;k<NDIM;k++){
@@ -243,7 +294,8 @@ int main (int argc, char** argv)
 		}
 		size_t index = BlockGeometry::CoorToIndex(DestCoor,TotalSites);
 		if( recv_buf[i+mem_size*j]!=(i+offset1*(index+offset2*Dest.BlockIndex())) ) 
-    	PRINT ("recv_buf[%d][%d][%d] = %d (%d)\n",Dest.BlockIndex(),j,i,recv_buf[i+mem_size*j], (i+offset1*(index+offset2*Dest.BlockIndex())) );
+//    	PRINT ("recv_buf[%d][%d][%d] = %ld (%lde)\n",Dest.BlockIndex(),j,i,recv_buf[i+mem_size*j], (i+offset1*(index+offset2*Dest.BlockIndex())) );
+    	std::cout << "recv_buf[" <<Dest.BlockIndex()<< "]["<< j << "]["<< i << "]= "<< recv_buf[i+mem_size*j]<<" != " << (i+offset1*(index+offset2*Dest.BlockIndex())) <<std::endl;
     }
 	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run check %g ms\n",t1-t0); t0=t1;
 
@@ -266,14 +318,15 @@ int main (int argc, char** argv)
 	bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 	
-#pragma omp parallel for
+//#pragma omp parallel for
     for(size_t k=0;k<Dest.BlockTotal();k++)
     for(size_t j=0;j<Src.DataVol();j++)
     for(size_t i=0;i<mem_size;i++)
 	if( *(send_buf[k]+i+mem_size*j) != *(recv2+i+mem_size*(j+Src.DataVol()*k)) ) 
     {
-    	PRINT ("send_buf[%d][%d][%d] = %d\n",k,j,i,*(send_buf[k]+i+mem_size*j));
-    	PRINT ("recv2[%d][%d][%d] = %d\n",k,j,i,*(recv2+i+mem_size*(j+Src.DataVol()*k)));
+    	std::cout << "send_buf[" << k << "]["<< j << "]["<< i << "]= "<< *(send_buf[k]+i+mem_size*j) <<" recv2  " << *(recv2+i+mem_size*(j+Src.DataVol()*k)) << std::endl;
+//    	PRINT ("send_buf[%ld][%ld][%ld] = %0.14e\n",k,j,i,*(send_buf[k]+i+mem_size*j));
+//    	PRINT ("recv2[%ld][%ld][%ld] = %0.14e\n",k,j,i,*(recv2+i+mem_size*(j+Src.DataVol()*k)));
     }
 	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run check %g ms\n",t1-t0); t0=t1;
 
@@ -281,7 +334,11 @@ int main (int argc, char** argv)
   
   std::cout <<scr1 <<"All passed!"<<std::endl;
 
+#ifdef USE_QMP
   QMP_finalize_msg_passing ();
+#else
+  MPI_Finalize();
+#endif
 
   return 0;
 }
