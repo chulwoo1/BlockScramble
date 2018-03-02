@@ -311,9 +311,14 @@ int main (int argc, char** argv)
 		rbuf[i] = recv2+i*mem_size*Src.DataVol();
 	}
 	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run setup %g ms\n",t1-t0); t0=t1;
+<<<<<<< HEAD
 	MPI_Barrier(mpi_comm);
 	scr1.run(Dest,Index,sbuf,Src,rbuf);
 	MPI_Barrier(mpi_comm);
+=======
+//	scr1.run(Dest,Index,sbuf,Src,rbuf);
+	scr1.run(Dest,Index,sbuf,Src,recv2,VecTotal);
+>>>>>>> 38e4801c685ab59403516afd4efb2be72e65b84e
 	t1 = dclock(); 
 	bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
