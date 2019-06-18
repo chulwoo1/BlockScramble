@@ -5,6 +5,8 @@
 //#include <qmp.h>
 #include "BlockGeom.h"
 
+#define USE_RPUT
+
 template < typename DATA > class Scramble:public virtual CartesianGeometry {
 public:
 
@@ -149,7 +151,7 @@ public:
 
 //#pragma omp critical
           {
-#if 0
+#ifndef USE_RPUT
             MPI_Put (send_buf[k] + mem_size * j,
                      bsize * mem_size * sizeof (DATA), MPI_BYTE, target, offset,
                      bsize * mem_size * sizeof (DATA), MPI_BYTE, recv_win);
@@ -174,8 +176,10 @@ public:
                   target, offset, bsize * mem_size * sizeof (DATA));
 #endif
         }
+#ifdef USE_RPUT
         MPI_Status put_st[nreq];
         MPI_Waitall (nreq, put_req, put_st);
+#endif
       }
 //      MPI_Win_flush_all (recv_win);
       MPI_Win_fence ((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), recv_win);
