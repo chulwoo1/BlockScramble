@@ -52,13 +52,13 @@ int init_MPI(int *argc, char*** argv,
   MPI_Comm_rank(MPI_COMM_WORLD,&rank);
   MPI_Comm_size(MPI_COMM_WORLD,&size);
 
-  if (*argc < 6) 
+  if (*argc < 9) 
     if (!rank){
       fprintf (stderr, "Usage: %s sites mem_size nblock verb geom \n", argv[0]);
     exit (1);
   }
 
-  int NDIM = *argc-5;
+  int NDIM = *argc-8;
   if (!rank)
    printf("NDIM=%d\n",NDIM);
   GlobalDim.resize(NDIM);
@@ -70,7 +70,7 @@ int init_MPI(int *argc, char*** argv,
 
   int pos = rank;
     for(int i =0;i<NDIM;i++){
-        GlobalDim[i] = atoi((*argv)[i+5]);
+        GlobalDim[i] = atoi((*argv)[i+8]);
         GlobalPos[i] = pos % GlobalDim[i];
 		pos = pos/GlobalDim[i];
 		if(verb>4)
@@ -163,12 +163,17 @@ int main (int argc, char** argv)
 	
   std::vector<int> GlobalDim(4);
   std::vector<int> GlobalPos(4);
+  std::vector <int> Sites(4); //number of sites
 
   int loops;
-  int sites = atoi (argv[1]); //global size
-  int mem_size = atoi (argv[2]);
-  int nblock = atoi (argv[3]);
-  verb = atoi (argv[4]);
+  int index=1;
+  Sites[0] = atoi (argv[index++]); //global size
+  Sites[1] = atoi (argv[index++]); //global size
+  Sites[2] = atoi (argv[index++]); //global size
+  Sites[3] = atoi (argv[index++]); //global size
+  int mem_size = atoi (argv[index++]);
+  int nblock = atoi (argv[index++]);
+  verb = atoi (argv[index++]);
 
   int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
 //  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
@@ -184,7 +189,7 @@ int main (int argc, char** argv)
     for(int i=0;i<NDIM;i++){
 		Src.BlockDim[i]=1;
 		Dest.BlockDim[i]=1;
-		TotalSites[i] = sites*GlobalDim[i];
+		TotalSites[i] = Sites[i]*GlobalDim[i];
 	
 	}	
 

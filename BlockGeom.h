@@ -1,5 +1,6 @@
 #ifndef BLOCK_GEOM_H
 #define BLOCK_GEOM_H
+#include<iostream>
 
 template<typename T>
 std::ostream& operator<<(std::ostream&s, std::vector<T> t) {
