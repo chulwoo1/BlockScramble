@@ -167,10 +167,17 @@ int main (int argc, char** argv)
   std::vector<int> GlobalPos(4);
 
   int loops;
+#if 1
   int sites = atoi (argv[1]); //global size
   int mem_size = atoi (argv[2]);
   int nblock = atoi (argv[3]);
   verb = atoi (argv[4]);
+#else
+  size_t sites;  std::cin >> sites;
+  size_t mem_size; std::cin >> mem_size;
+  size_t nblock ;std::cin >> nblock;
+  std::cin >> verb;
+#endif
 
   int NDIM = init_MPI(&argc,&argv,GlobalDim,GlobalPos);
 //  int NDIM = init_QMP(&argc,&argv,GlobalDim,GlobalPos);
