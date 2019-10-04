@@ -62,8 +62,9 @@ public:
 
     assert (SrcIndex.size () == send_buf.size ());
 	int bsize = GCF(Src.DataDim[0],Dest.DataDim[0]);
-//	bsize=1;
-	if (verb>5 && !rank )
+	bsize=1;
+//	if (verb>5 && !rank )
+	if (!rank )
 	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
@@ -96,7 +97,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	}
 
 
-#pragma omp parallel for 
+//#pragma omp parallel for 
 	for (size_t j = 0; j < Src.DataVol (); j += bsize) {
 	if(verb>5)
 	std::cout <<j<<" : thread "<<omp_get_thread_num()<<" of "<<omp_get_num_threads()<<std::endl;
@@ -130,7 +131,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	    }
 	  assert (DestWrap < recv_max);
 
-#pragma omp critical
+//#pragma omp critical
 {
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
 		   MPI_BYTE, target, offset,
