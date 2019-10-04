@@ -11,10 +11,12 @@
 
 #include <mpi.h>
 #include <vector>
+#include <iostream>
 
 
 #include "BlockGeom.h"
 #include "Scramble.h"
+
 
 /**
  * Get current time in milli seconds.
