@@ -291,15 +291,17 @@ int main (int argc, char** argv)
 	}
 
 	Scramble<DATA> scr1(mem_size, &mpi_comm,verb);
+	MPI_Barrier(mpi_comm);
 	double t0 = dclock();
 	scr1.run(Src,Index,sbuf,Dest,rbuf);
+	MPI_Barrier(mpi_comm);
 	double t1 = dclock();
 	double bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
 
 {
-	t0 = dclock();
 	MPI_Barrier(mpi_comm);
+	t0 = dclock();
     MPI_Alltoall(recv_buf,a2a_size,MPI_BYTE,recv2,a2a_size,MPI_BYTE,mpi_comm);
 	MPI_Barrier(mpi_comm);
 	t1 = dclock();
@@ -332,8 +334,12 @@ int main (int argc, char** argv)
 	for(int i=0;i<VecTotal;i++){
 		rbuf[i] = recv2+i*mem_size*Src.DataVol();
 	}
+
 	t1 = dclock(); if(!GlobalIndex) PRINT("scr1.run setup %g ms\n",t1-t0); t0=t1;
+	MPI_Barrier(mpi_comm);
+	t0 = dclock();
 	scr1.run(Dest,Index,sbuf,Src,rbuf);
+	MPI_Barrier(mpi_comm);
 	t1 = dclock(); 
 	bw = bytes/(t1-t0)/1000.; 
 	if(!GlobalIndex) PRINT("scr1.run %g bytes / %g ms injection bw = %g MB/s per node \n",bytes,t1-t0,bw); t0=t1;
