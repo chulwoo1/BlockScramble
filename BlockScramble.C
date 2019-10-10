@@ -250,8 +250,10 @@ int main (int argc, char** argv)
 	size_t a2a_size = (sizeof(DATA)*mem_size*Dest.DataVol())/GlobalTotal;
 	int VecTotal = Dest.BlockTotal();
 	DATA * send_buf[VecTotal];
+	send_buf[0]= (DATA*)malloc(sizeof(DATA)*mem_size*Src.DataVol()*VecTotal);
 	for(int i=0;i<VecTotal;i++) 
-		send_buf[i]= (DATA*)malloc(sizeof(DATA)*mem_size*Src.DataVol());
+//		send_buf[i]= (DATA*)malloc(sizeof(DATA)*mem_size*Src.DataVol());
+		send_buf[i]= send_buf[0] + i*mem_size*Src.DataVol();
     DATA * recv_buf = (DATA*)malloc(sizeof(DATA)*mem_size*Dest.DataVol());
     DATA * recv2 = (DATA*)malloc(sizeof(DATA)*mem_size*Dest.DataVol());
 	size_t offset1 = 10;

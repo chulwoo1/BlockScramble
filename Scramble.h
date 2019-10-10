@@ -68,10 +68,14 @@ public:
 	std::cout << "bsize: "<<bsize<<std::endl;
     int NDIM = Src.Dim ();
     int recv_max = recv_buf.size ();
-for (int recv_i = 0; recv_i < recv_max; recv_i++) {
+//for (int recv_i = 0; recv_i < recv_max; recv_i++) {
+{
+//      MPI_Barrier(MPI_COMM_WORLD);
+//      size_t RecvBlkSize=sizeof (DATA) * mem_size * Dest.DataVol ();
+      size_t DispSize=sizeof (DATA)*mem_size;
       MPI_Win  recv_win;
-	MPI_Win_create (recv_buf[recv_i], sizeof (DATA) * mem_size * Dest.DataVol (),
-			sizeof (DATA)*mem_size, MPI_INFO_NULL, *mpi_comm,
+	MPI_Win_create (recv_buf[0], recv_max*DispSize*Dest.DataVol (),
+			DispSize, MPI_INFO_NULL, *mpi_comm,
 			&recv_win);
 	MPI_Win_fence (MPI_MODE_NOPRECEDE, recv_win);
 
@@ -80,10 +84,11 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 	  IndexToCoor (SrcIndex[k], DestBlockCoor, Dest.BlockDim);
 	  int DestWrap = SrcIndex[k]/Dest.BlockTotal();
 
-	if (DestWrap != recv_i) continue;
+//	if (DestWrap != recv_i) continue;
+	assert (DestWrap < recv_max);
 	if(verb>5)
 	printf("rank %d: SrcIndex[%d]=%d DestWrap=%d recv_i=%d\n",rank,
-	k,SrcIndex[k],DestWrap,recv_i);
+	k,SrcIndex[k],DestWrap,DestWrap);
 
 	if(!rank)
 	if (verb>5)
@@ -134,7 +139,7 @@ for (int recv_i = 0; recv_i < recv_max; recv_i++) {
 //#pragma omp critical
 {
 	  MPI_Put (send_buf[k] + mem_size * j, bsize*mem_size * sizeof (DATA),
-		   MPI_BYTE, target, offset,
+		   MPI_BYTE, target, offset + DestWrap*Dest.DataVol (),
 		   bsize*mem_size * sizeof (DATA), MPI_BYTE, recv_win);
 	if(verb>6)
 	std::cout << *this << "MPI_Put: send_buf["<< k << "]+" <<mem_size * j<<" "<<bsize*mem_size * sizeof (DATA) << " : "<<target <<" "<< offset <<" "<<bsize*mem_size * sizeof (DATA) <<std::endl;
